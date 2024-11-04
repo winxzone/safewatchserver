@@ -1,5 +1,6 @@
-package com.savewatchserver.models
+package com.savewatchserver.models.user
 
+import com.savewatchserver.models.Child
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
 import org.bson.types.ObjectId
@@ -10,10 +11,8 @@ data class User(
     val name: String,
     val email: String,
     val passwordHash: String,
-    val role: Role = Role.PARENT,
-    val children: List<String>? = null
+    val children: List<Child> = emptyList() // Список детей, которых родитель может добавлять
 )
 
-enum class Role {
-    PARENT, CHILD
-}
+
+
