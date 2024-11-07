@@ -36,20 +36,27 @@ object UserController {
             )
             call.respond(user)
         } else {
-            call.respond(HttpStatusCode.NotFound, "User not found")
+            call.respond(HttpStatusCode.NotFound, "Пользователь не найден")
         }
     }
 
     suspend fun registerUser(call: ApplicationCall) {
         val registrationData = call.receive<UserRegistration>()
+        call.application.log.info("Registration attempt with email: ${registrationData.email}")
 
         // Валидация данных пользователя
         if (!UserValidator.validateRegistrationData(call, registrationData)) return
 
+        // Проверка на совпадение паролей
+        if (registrationData.password != registrationData.confirmPassword) {
+            call.respond(HttpStatusCode.BadRequest, "Пароли не совпадают")
+            return
+        }
+
         // Проверка на дублирование email
         val existingUser = database.getCollection("users").find(Document("email", registrationData.email)).firstOrNull()
         if (existingUser != null) {
-            call.respond(HttpStatusCode.Conflict, "Email already registered")
+            call.respond(HttpStatusCode.Conflict, "Почта уже зарегистрирована")
             return
         }
 
@@ -87,15 +94,18 @@ object UserController {
             val hashedPassword = userDoc.getString("passwordHash")
 
             if (PasswordUtils.checkPassword(loginData.password, hashedPassword)) {
+                // Если пароль правильный, генерируем JWT токен
                 val userId = userDoc.getObjectId("_id").toHexString()
                 val token = GenerateJwtToken.generateToken(userId)
-                call.respond(HttpStatusCode.OK, mapOf("token" to token))
-                call.respond(HttpStatusCode.OK, "Login successful")
+                // Отправляем ответ с токеном
+                call.respond(HttpStatusCode.OK, mapOf("token" to token, "message" to "Login successful"))
             } else {
-                call.respond(HttpStatusCode.Unauthorized, "Invalid password")
+                // Неверный пароль
+                call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid password"))
             }
         } else {
-            call.respond(HttpStatusCode.NotFound, "User not found")
+            // Пользователь не найден
+            call.respond(HttpStatusCode.NotFound, mapOf("error" to "User not found"))
         }
     }
 }
