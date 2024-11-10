@@ -5,13 +5,17 @@ import com.savewatchserver.models.Child
 import com.savewatchserver.models.user.User
 import com.savewatchserver.models.user.UserLogin
 import com.savewatchserver.models.user.UserRegistration
+import com.savewatchserver.models.user.UserProfile
 import com.savewatchserver.utils.GenerateJwtToken
 import com.savewatchserver.utils.PasswordUtils
 import com.savewatchserver.validation.UserValidator
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.auth.jwt.JWTPrincipal
+import io.ktor.server.auth.principal
 import io.ktor.server.request.*
 import io.ktor.server.response.*
+import io.ktor.server.routing.RoutingCall
 import org.bson.Document
 import org.bson.types.ObjectId
 
@@ -106,6 +110,59 @@ object UserController {
         } else {
             // Пользователь не найден
             call.respond(HttpStatusCode.NotFound, mapOf("error" to "User not found"))
+        }
+    }
+
+    suspend fun getUserProfile(call: ApplicationCall) {
+        val userId = call.principal<JWTPrincipal>()?.payload?.getClaim("userId")?.asString()
+        val userDoc = database.getCollection("users").find(Document("_id", ObjectId(userId))).firstOrNull()
+
+
+        if (userDoc != null) {
+            val userProfile = UserProfile(
+                id = userDoc.getObjectId("_id").toHexString(),
+                name = userDoc.getString("name"),
+                email = userDoc.getString("email"),
+                children = userDoc.getList("children", Document::class.java)?.map { childDoc ->
+                    Child(
+                        id = childDoc.getObjectId("_id").toHexString(),
+                        name = childDoc.getString("name"),
+                        age = childDoc.getInteger("age"),
+                        photoId = childDoc.getString("photoId")
+                    )
+                } ?: emptyList()
+            )
+            call.respond(HttpStatusCode.OK, userProfile)
+        } else {
+            call.respond(HttpStatusCode.NotFound, "User not found")
+        }
+    }
+
+    suspend fun addChildForUser(call: ApplicationCall) {
+        val principal = call.principal<JWTPrincipal>()
+        val userId = principal?.payload?.getClaim("userId")?.asString()
+            ?: return call.respond(HttpStatusCode.Unauthorized, "Missing userId in token")
+
+        // Получаем данные ребенка из запроса
+        val child = call.receive<Child>()
+
+        // Создаем документ для ребенка
+        val childDoc = Document()
+            .append("_id", ObjectId())
+            .append("name", child.name)
+            .append("age", child.age)
+            .append("photoId", child.photoId)
+
+        // Добавляем ребенка в коллекцию "users"
+        val updateResult = database.getCollection("users").updateOne(
+            Document("_id", ObjectId(userId)),
+            Document("\$push", Document("children", childDoc))
+        )
+
+        if (updateResult.matchedCount > 0) {
+            call.respond(HttpStatusCode.Created, "Child added successfully")
+        } else {
+            call.respond(HttpStatusCode.NotFound, "User not found")
         }
     }
 }
