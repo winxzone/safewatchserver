@@ -1,15 +1,10 @@
 package com.savewatchserver.routes
 
 import com.savewatchserver.controllers.UserController
-import com.savewatchserver.models.Child
-import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
-import io.ktor.server.auth.jwt.JWTPrincipal
-import io.ktor.server.auth.principal
-import io.ktor.server.request.receive
 import io.ktor.server.routing.*
 
-fun Route.userRoutes() {
+fun Route.userRouter() {
     route("/user") {
         // Получение пользователя по ID
         get("/{id}") {
@@ -32,12 +27,5 @@ fun Route.userRoutes() {
                 UserController.getUserProfile(call)
             }
         }
-
-        authenticate("auth-jwt") {
-            post("/add-child") {
-                UserController.addChildForUser(call)
-            }
-        }
-
     }
 }

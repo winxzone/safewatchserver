@@ -33,7 +33,6 @@ object UserController {
                     Child(
                         id = it.getObjectId("_id").toHexString(),
                         name = it.getString("name"),
-                        age = it.getInteger("age"),
                         photoId = it.getString("photoId")
                     )
                 } ?: emptyList()
@@ -115,22 +114,15 @@ object UserController {
 
     suspend fun getUserProfile(call: ApplicationCall) {
         val userId = call.principal<JWTPrincipal>()?.payload?.getClaim("userId")?.asString()
-        val userDoc = database.getCollection("users").find(Document("_id", ObjectId(userId))).firstOrNull()
+            ?: return call.respond(HttpStatusCode.Unauthorized, "Missing userId in token")
 
+        val userDoc = database.getCollection("users").find(Document("_id", ObjectId(userId))).firstOrNull()
 
         if (userDoc != null) {
             val userProfile = UserProfile(
                 id = userDoc.getObjectId("_id").toHexString(),
                 name = userDoc.getString("name"),
-                email = userDoc.getString("email"),
-                children = userDoc.getList("children", Document::class.java)?.map { childDoc ->
-                    Child(
-                        id = childDoc.getObjectId("_id").toHexString(),
-                        name = childDoc.getString("name"),
-                        age = childDoc.getInteger("age"),
-                        photoId = childDoc.getString("photoId")
-                    )
-                } ?: emptyList()
+                email = userDoc.getString("email")
             )
             call.respond(HttpStatusCode.OK, userProfile)
         } else {
@@ -150,7 +142,6 @@ object UserController {
         val childDoc = Document()
             .append("_id", ObjectId())
             .append("name", child.name)
-            .append("age", child.age)
             .append("photoId", child.photoId)
 
         // Добавляем ребенка в коллекцию "users"
