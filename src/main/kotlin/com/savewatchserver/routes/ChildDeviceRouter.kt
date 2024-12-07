@@ -19,6 +19,9 @@ fun Route.childDeviceRouter() {
             get("/list") {
                 ChildDeviceController.listChildDevices(call)
             }
+            post("/cancel/{deviceId}") {
+                ChildDeviceController.cancelChildDeviceRequest(call)
+            }
         }
     }
 }

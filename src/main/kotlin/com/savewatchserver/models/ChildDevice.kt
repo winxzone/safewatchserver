@@ -7,8 +7,12 @@ import org.bson.types.ObjectId
 @Serializable
 data class ChildDevice(
     @BsonId val id: String = ObjectId().toString(),
-    val parentId: String? = null,
+    val accountId: String? = null,
+    val childId: String? = null,
     val name: String,
-    val status: String = "unconfirmed" // Статус устройства: "unconfirmed" или "confirmed"
+    val deviceId: String? = null,
+    val status: String = "unconfirmed",
+    val createdAt: Long = System.currentTimeMillis(),
+    val confirmedAt: Long? = null
 )
 
