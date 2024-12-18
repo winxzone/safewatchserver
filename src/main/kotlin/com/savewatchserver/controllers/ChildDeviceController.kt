@@ -3,6 +3,7 @@ package com.savewatchserver.controllers
 import com.savewatchserver.MongoDBConnection.database
 import com.savewatchserver.models.ChildDevice
 import com.savewatchserver.models.Child
+import com.savewatchserver.constants.ErrorMessage
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.jwt.JWTPrincipal
@@ -17,7 +18,7 @@ object ChildDeviceController {
     // Метод регистрации устройства ребенка
     suspend fun registerChildDevice(call: ApplicationCall) {
         val accountId = call.principal<JWTPrincipal>()?.payload?.getClaim("userId")?.asString()
-            ?: return call.respond(HttpStatusCode.Unauthorized, "User authentication required")
+            ?: return call.respond(HttpStatusCode.Unauthorized, ErrorMessage.UNAUTHORIZED)
 
         val childDeviceRequest = call.receive<ChildDevice>()
 
@@ -42,28 +43,27 @@ object ChildDeviceController {
         call.respond(HttpStatusCode.Created, mapOf("deviceId" to childDevice.id))
     }
 
-
     // Метод подтверждения устройства ребенка
     suspend fun confirmChildDevice(call: ApplicationCall) {
         val accountId = call.principal<JWTPrincipal>()?.payload?.getClaim("userId")?.asString()
-            ?: return call.respond(HttpStatusCode.Unauthorized, "User authentication required")
+            ?: return call.respond(HttpStatusCode.Unauthorized, ErrorMessage.UNAUTHORIZED)
 
         val deviceId = call.parameters["deviceId"]
-            ?: return call.respond(HttpStatusCode.BadRequest, "Device ID is required")
+            ?: return call.respond(HttpStatusCode.BadRequest, ErrorMessage.MISSING_DEVICE_ID)
 
         val deviceDoc = database.getCollection("childDevices").find(
             Document("_id", ObjectId(deviceId)).append("accountId", ObjectId(accountId))
         ).firstOrNull()
 
         if (deviceDoc == null) {
-            call.respond(HttpStatusCode.NotFound, "Device not found")
+            call.respond(HttpStatusCode.NotFound, ErrorMessage.DEVICE_NOT_FOUND)
             return
         }
 
         // Проверяем, что устройство еще не связано с ребенком
         val existingChildId = deviceDoc.getString("childId")
         if (!existingChildId.isNullOrEmpty()) {
-            call.respond(HttpStatusCode.BadRequest, "Device is already linked to a child")
+            call.respond(HttpStatusCode.BadRequest, ErrorMessage.DEVICE_ALREADY_LINKED)
             return
         }
 
@@ -72,7 +72,7 @@ object ChildDeviceController {
         val child = Child(
             id = childId,
             name = deviceDoc.getString("name") ?: "Unnamed Child",
-            photoId = "default_photo_id" // Фиксированное фото по умолчанию
+            photoId = "default_photo_id" // фото по умолчанию
         )
 
         val childDoc = Document()
@@ -87,7 +87,7 @@ object ChildDeviceController {
         )
 
         if (userUpdateResult.matchedCount.toInt() == 0) {
-            call.respond(HttpStatusCode.NotFound, "User not found")
+            call.respond(HttpStatusCode.NotFound, ErrorMessage.USER_NOT_FOUND)
             return
         }
 
@@ -102,21 +102,21 @@ object ChildDeviceController {
         if (deviceUpdateResult.matchedCount > 0) {
             call.respond(HttpStatusCode.OK, mapOf("childId" to childId))
         } else {
-            call.respond(HttpStatusCode.InternalServerError, "Failed to confirm device")
+            call.respond(HttpStatusCode.InternalServerError, ErrorMessage.DEVICE_CONFIRMATION_FAILED)
         }
     }
 
     // Метод получения списка устройств ребенка
     suspend fun listChildDevices(call: ApplicationCall) {
         val accountId = call.principal<JWTPrincipal>()?.payload?.getClaim("userId")?.asString()
-            ?: return call.respond(HttpStatusCode.Unauthorized, "User authentication required")
+            ?: return call.respond(HttpStatusCode.Unauthorized, ErrorMessage.UNAUTHORIZED)
 
         val devices = database.getCollection("childDevices")
             .find(Document("accountId", ObjectId(accountId)))
             .toList()
 
         if (devices.isEmpty()) {
-            call.respond(HttpStatusCode.NotFound, "No child devices found for this account")
+            call.respond(HttpStatusCode.NotFound, ErrorMessage.NO_CHILD_DEVICES_FOUND)
         } else {
             val childDevices = devices.map { doc ->
                 val status = doc.getString("status")
@@ -151,10 +151,10 @@ object ChildDeviceController {
     // Метод для отмены запроса на подтверждение устройства
     suspend fun cancelChildDeviceRequest(call: ApplicationCall) {
         val accountId = call.principal<JWTPrincipal>()?.payload?.getClaim("userId")?.asString()
-            ?: return call.respond(HttpStatusCode.Unauthorized, "User authentication required")
+            ?: return call.respond(HttpStatusCode.Unauthorized, ErrorMessage.UNAUTHORIZED)
 
         val deviceId = call.parameters["deviceId"]
-            ?: return call.respond(HttpStatusCode.BadRequest, "Device ID is required")
+            ?: return call.respond(HttpStatusCode.BadRequest, ErrorMessage.MISSING_DEVICE_ID)
 
         // Проверяем, существует ли устройство с этим ID и accountId
         val deviceDoc = database.getCollection("childDevices").find(
@@ -162,14 +162,14 @@ object ChildDeviceController {
         ).firstOrNull()
 
         if (deviceDoc == null) {
-            call.respond(HttpStatusCode.NotFound, "Device not found or you are not authorized to cancel it")
+            call.respond(HttpStatusCode.NotFound, ErrorMessage.DEVICE_NOT_FOUND)
             return
         }
 
         // Проверяем статус устройства, если оно уже подтверждено, то нельзя отменить
         val status = deviceDoc.getString("status")
         if (status == "confirmed") {
-            call.respond(HttpStatusCode.BadRequest, "Cannot cancel a confirmed device")
+            call.respond(HttpStatusCode.BadRequest, ErrorMessage.CANNOT_CANCEL_CONFIRMED_DEVICE)
             return
         }
 
@@ -182,7 +182,7 @@ object ChildDeviceController {
         if (updateResult.matchedCount > 0) {
             call.respond(HttpStatusCode.OK, "Device confirmation request cancelled successfully.")
         } else {
-            call.respond(HttpStatusCode.InternalServerError, "Failed to cancel device request")
+            call.respond(HttpStatusCode.InternalServerError, ErrorMessage.DEVICE_CANCELLATION_FAILED)
         }
     }
 
