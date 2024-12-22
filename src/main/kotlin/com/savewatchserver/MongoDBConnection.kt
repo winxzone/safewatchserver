@@ -5,6 +5,8 @@ import com.mongodb.MongoClientSettings
 import com.mongodb.client.MongoClient
 import com.mongodb.client.MongoClients
 import com.mongodb.client.MongoDatabase
+import com.mongodb.client.gridfs.GridFSBucket
+import com.mongodb.client.gridfs.GridFSBuckets
 
 
 object MongoDBConnection {
@@ -22,5 +24,11 @@ object MongoDBConnection {
     val database: MongoDatabase by lazy {
         client.getDatabase(DATABASE_NAME)
     }
+
+    val gridFSBucket: GridFSBucket by lazy {
+        GridFSBuckets.create(database)
+    }
+
+
 
 }

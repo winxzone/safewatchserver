@@ -13,7 +13,7 @@ group = "com.example"
 version = "0.0.1"
 
 application {
-    mainClass.set("com.example.ApplicationKt")
+    mainClass.set("com.savewatchserver.ApplicationKt")
 
     val isDevelopment: Boolean = project.ext.has("development")
     applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
@@ -36,6 +36,7 @@ dependencies {
     implementation("io.ktor:ktor-server-cio-jvm")
     implementation("io.ktor:ktor-server-cors-jvm")
     implementation("ch.qos.logback:logback-classic:$logback_version")
+    implementation("io.ktor:ktor-utils-jvm:2.3.11")
     testImplementation("io.ktor:ktor-server-test-host-jvm")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version")
 //    testImplementation("io.ktor:ktor-server-tests-jvm")
