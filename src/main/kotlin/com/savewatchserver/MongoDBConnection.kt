@@ -8,7 +8,6 @@ import com.mongodb.client.MongoDatabase
 import com.mongodb.client.gridfs.GridFSBucket
 import com.mongodb.client.gridfs.GridFSBuckets
 
-
 object MongoDBConnection {
     private const val CONNECTION_STRING = "mongodb://localhost:27017"
     private const val DATABASE_NAME = "safewatchserver"
@@ -25,10 +24,12 @@ object MongoDBConnection {
         client.getDatabase(DATABASE_NAME)
     }
 
-    val gridFSBucket: GridFSBucket by lazy {
-        GridFSBuckets.create(database)
+    val ScreenshotsBucket: GridFSBucket by lazy {
+        GridFSBuckets.create(database, "Screenshots")
     }
 
-
+    val childAvatarsBucket: GridFSBucket by lazy {
+        GridFSBuckets.create(database, "childAvatars")
+    }
 
 }

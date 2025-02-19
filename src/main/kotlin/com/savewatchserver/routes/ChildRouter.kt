@@ -20,7 +20,15 @@ fun Route.childRouter() {
             put("/{childId}/profile/change-name"){
                 ChildController.updateChildName(call)
             }
-//            Не очень корректное название, нужно будет изменить
+            put("/{childId}/profile/photo/upload"){
+                ChildController.uploadChildPhoto(call)
+            }
+            get("/{childId}/profile/photo"){
+                ChildController.downloadChildPhoto(call)
+            }
+            get("all/photo/{childId}"){
+                ChildController.downloadChildPhoto(call)
+            }
             get("/all") {
                 ChildController.getAllChildren(call)
             }

@@ -7,7 +7,7 @@ import org.bson.types.ObjectId
 @Serializable
 data class ChildDevice(
     @BsonId val id: String = ObjectId().toString(),
-    val accountId: String? = null,
+    val userId: String? = null,
     val childId: String? = null,
     val name: String,
     val deviceId: String? = null,
