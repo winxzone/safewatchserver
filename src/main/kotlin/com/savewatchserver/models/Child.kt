@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class Child(
-    val id: String? = null,
+    val id: String?,
     val name: String,
     val photoId: String? = null
 )

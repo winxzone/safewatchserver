@@ -1,7 +1,6 @@
 package com.savewatchserver.models.user
 
 import com.savewatchserver.models.Child
-import com.savewatchserver.models.ChildDevice
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
 import org.bson.types.ObjectId
@@ -12,8 +11,7 @@ data class User(
     val name: String,
     val email: String,
     val passwordHash: String,
-    val children: List<Child> = emptyList(),
-    val childDevices: List<ChildDevice> = emptyList()
+    val children: MutableList<Child> = mutableListOf(),
 )
 
 

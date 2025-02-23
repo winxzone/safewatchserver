@@ -1,6 +1,6 @@
 package com.savewatchserver.controllers
 
-import com.savewatchserver.MongoDBConnection.database
+import com.savewatchserver.collections.UserCollection
 import com.savewatchserver.constants.ErrorMessage
 import com.savewatchserver.models.Child
 import com.savewatchserver.models.user.User
@@ -17,12 +17,11 @@ import io.ktor.server.auth.principal
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import org.bson.Document
-import org.bson.types.ObjectId
 
 object UserController {
 
     suspend fun getUserById(call: ApplicationCall, id: String) {
-        val doc = database.getCollection("users").find(Document("_id", ObjectId(id))).first()
+        val doc = UserCollection.findById(id)
         if (doc != null) {
             val user = User(
                 id = doc.getObjectId("_id").toHexString(),
@@ -54,8 +53,7 @@ object UserController {
             return
         }
 
-        val existingUser = database.getCollection("users").find(Document("email", registrationData.email)).firstOrNull()
-        if (existingUser != null) {
+        if (UserCollection.findByEmail(registrationData.email) != null) {
             call.respond(HttpStatusCode.Conflict, ErrorMessage.EMAIL_ALREADY_REGISTERED)
             return
         }
@@ -69,38 +67,26 @@ object UserController {
             children = mutableListOf()
         )
 
-        val doc = Document()
-            .append("_id", ObjectId())
-            .append("name", user.name)
-            .append("email", user.email)
-            .append("passwordHash", user.passwordHash)
-            .append("children", user.children)
+        val userId = UserCollection.insertUser(user)
 
-        database.getCollection("users").insertOne(doc)
-
-        val userId = doc.getObjectId("_id").toHexString()
         call.respond(HttpStatusCode.Created, mapOf("userId" to userId))
     }
 
     suspend fun loginUser(call: ApplicationCall) {
         val loginData = call.receive<UserLogin>()
-        val userDoc = database.getCollection("users").find(Document("email", loginData.email)).firstOrNull()
+        val userDoc = UserCollection.findByEmail(loginData.email)
 
         if (userDoc != null) {
             val hashedPassword = userDoc.getString("passwordHash")
 
             if (PasswordUtils.checkPassword(loginData.password, hashedPassword)) {
-                // Если пароль правильный, генерируем JWT токен
                 val userId = userDoc.getObjectId("_id").toHexString()
                 val token = GenerateJwtToken.generateToken(userId)
-                // Отправляем ответ с токеном
                 call.respond(HttpStatusCode.OK, mapOf("token" to token, "message" to "Login successful"))
             } else {
-                // Неверный пароль
                 call.respond(HttpStatusCode.Unauthorized, mapOf("error" to ErrorMessage.INVALID_PASSWORD))
             }
         } else {
-            // Пользователь не найден
             call.respond(HttpStatusCode.NotFound, mapOf("error" to ErrorMessage.USER_NOT_FOUND))
         }
     }
@@ -109,7 +95,7 @@ object UserController {
         val userId = call.principal<JWTPrincipal>()?.payload?.getClaim("userId")?.asString()
             ?: return call.respond(HttpStatusCode.Unauthorized, ErrorMessage.UNAUTHORIZED)
 
-        val userDoc = database.getCollection("users").find(Document("_id", ObjectId(userId))).firstOrNull()
+        val userDoc = UserCollection.findById(userId)
 
         if (userDoc != null) {
             val userProfile = UserProfile(

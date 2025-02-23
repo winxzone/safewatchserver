@@ -35,17 +35,6 @@ object UserCollection {
         return doc.getObjectId("_id").toHexString()
     }
 
-    fun findChildrenByAccountId(accountId: String): List<Child> {
-        val userDoc = collection.find(Document("_id", ObjectId(accountId))).firstOrNull()
-        return userDoc?.getList("children", Document::class.java)?.map {
-            Child(
-                id = it.getObjectId("_id").toHexString(),
-                name = it.getString("name"),
-                photoId = it.getString("photoId")
-            )
-        } ?: emptyList()
-    }
-
     fun findChildPhotoId(childId: ObjectId): String? {
         val userDoc = collection.find(Filters.eq("children._id", childId))
             .projection(Projections.fields(Projections.include("children")))
@@ -66,39 +55,21 @@ object UserCollection {
         return updateResult.matchedCount > 0
     }
 
-    fun addChildToUser(userId: String, childDoc: Document): Boolean {
-        val existingChild = collection.find(Filters.eq("_id", ObjectId(userId)))
-            .projection(Projections.fields(Projections.include("children")))
-            .firstOrNull()
-            ?.getList("children", Document::class.java)
-            ?.find { it.getString("name") == childDoc.getString("name") }
-
-        // Если ребенок уже есть, обновляем его фото и удаляем старое
-        if (existingChild != null) {
-            val oldPhotoId = existingChild.getString("photoId")
-            val newPhotoId = childDoc.getString("photoId")
-
-            val updateResult = collection.updateOne(
-                Filters.and(Filters.eq("_id", ObjectId(userId)), Filters.eq("children._id", existingChild.getObjectId("_id"))),
-                Updates.set("children.$[elem].photoId", newPhotoId),
-                UpdateOptions().arrayFilters(listOf(Filters.eq("elem._id", existingChild.getObjectId("_id"))))
-            )
-
-            if (updateResult.matchedCount > 0) {
-                if (!oldPhotoId.isNullOrBlank()) {
-                    deleteOldPhoto(oldPhotoId)
-                }
-                return true
-            }
-            return false
-        }
-
-        // Если ребенка нет, просто добавляем
+    fun addChildToUser(userId: String, childId: ObjectId, child: Child): Boolean {
+        val childDoc = Document("_id", childId)
+            .append("name", child.name)
+            .append("photoId", child.photoId)
         val updateResult = collection.updateOne(
             Filters.eq("_id", ObjectId(userId)),
             Updates.push("children", childDoc)
         )
-        return updateResult.matchedCount > 0
+        val success = updateResult.matchedCount > 0
+        if (success) {
+            println("Added child $childId to user $userId")
+        } else {
+            println("Failed to add child $childId to user $userId - user not found")
+        }
+        return success
     }
 
     fun deleteOldPhoto(photoId: String) {
