@@ -56,10 +56,10 @@ object ChildDeviceController {
         val userId = call.principal<JWTPrincipal>()?.payload?.getClaim("userId")?.asString()
             ?: return call.respond(HttpStatusCode.Unauthorized, ErrorMessage.UNAUTHORIZED)
 
-        val deviceId = call.parameters["deviceId"]
+        val childDeviceId = call.parameters["childDeviceId"]
             ?: return call.respond(HttpStatusCode.BadRequest, ErrorMessage.MISSING_DEVICE_ID)
 
-        val deviceDoc = ChildDeviceCollection.findByIdAndUserId(deviceId, userId)
+        val deviceDoc = ChildDeviceCollection.findByIdAndUserId(childDeviceId, userId)
 
         if (deviceDoc == null) {
             call.respond(HttpStatusCode.NotFound, ErrorMessage.DEVICE_NOT_FOUND)
@@ -71,7 +71,7 @@ object ChildDeviceController {
             return
         }
 
-        ChildDeviceCollection.updateDeviceStatus(deviceId, "confirmed")
+        ChildDeviceCollection.updateDeviceStatus(childDeviceId, "confirmed")
 
         call.respond(HttpStatusCode.OK, mapOf("message" to "Device confirmed. Please link it to a child profile later."))
     }
@@ -81,13 +81,13 @@ object ChildDeviceController {
             ?: return call.respond(HttpStatusCode.Unauthorized, ErrorMessage.UNAUTHORIZED)
 
         val multipart = call.receiveMultipart()
-        var deviceId: String? = null
+        var childDeviceId: String? = null
         var name: String? = null
         var photoId: ObjectId? = null
 
         multipart.forEachPart { part ->
             when {
-                part is PartData.FormItem && part.name == "deviceId" -> deviceId = part.value
+                part is PartData.FormItem && part.name == "childDeviceId" -> childDeviceId = part.value
                 part is PartData.FormItem && part.name == "name" -> name = part.value
                 part is PartData.FileItem && part.name == "photo" -> {
                     val fileName = part.originalFileName ?: "photo_${System.currentTimeMillis()}.jpg"
@@ -106,22 +106,22 @@ object ChildDeviceController {
             part.dispose()
         }
 
-        if (deviceId.isNullOrEmpty() || name.isNullOrEmpty()) {
-            println("Missing deviceId or name: deviceId=$deviceId, name=$name")
-            return call.respond(HttpStatusCode.BadRequest, "Missing deviceId or name")
+        if (childDeviceId.isNullOrEmpty() || name.isNullOrEmpty()) {
+            println("Missing childDeviceId or name: childDeviceId=$childDeviceId, name=$name")
+            return call.respond(HttpStatusCode.BadRequest, "Missing childDeviceId or name")
         }
 
-        println("Processing: deviceId=$deviceId, name=$name, userId=$userId")
+        println("Processing: childDeviceId=$childDeviceId, name=$name, userId=$userId")
 
-        val deviceDoc = ChildDeviceCollection.findByIdAndUserId(deviceId!!, userId)
+        val deviceDoc = ChildDeviceCollection.findByIdAndUserId(childDeviceId!!, userId)
         if (deviceDoc == null) {
-            println("Device not found: $deviceId for user: $userId")
+            println("Device not found: $childDeviceId for user: $userId")
             return call.respond(HttpStatusCode.NotFound, ErrorMessage.DEVICE_NOT_FOUND)
         }
 
         val currentChildId = deviceDoc["childId"]?.toString()
         if (!currentChildId.isNullOrEmpty()) {
-            println("Device already linked: $deviceId to child: $currentChildId")
+            println("Device already linked: $childDeviceId to child: $currentChildId")
             return call.respond(HttpStatusCode.BadRequest, ErrorMessage.DEVICE_ALREADY_LINKED)
         }
 
@@ -135,8 +135,8 @@ object ChildDeviceController {
             return call.respond(HttpStatusCode.NotFound, "User not found")
         }
 
-        ChildDeviceCollection.updateDeviceStatus(deviceId!!, "confirmed", childId.toHexString())
-        println("Device $deviceId confirmed and linked to child $childId")
+        ChildDeviceCollection.updateDeviceStatus(childDeviceId!!, "confirmed", childId.toHexString())
+        println("Device $childDeviceId confirmed and linked to child $childId")
 
         call.respond(HttpStatusCode.OK, mapOf("childId" to childId.toHexString()))
     }
@@ -168,7 +168,6 @@ object ChildDeviceController {
         call.respond(HttpStatusCode.OK, childDevices)
     }
 
-    // Метод для отмены запроса на подтверждение устройства
     suspend fun cancelChildDeviceRequest(call: ApplicationCall) {
         val userId = call.principal<JWTPrincipal>()?.payload?.getClaim("userId")?.asString()
             ?: return call.respond(HttpStatusCode.Unauthorized, ErrorMessage.UNAUTHORIZED)
@@ -183,7 +182,6 @@ object ChildDeviceController {
             return
         }
 
-        // Проверяем статус устройства, если оно уже подтверждено, то нельзя отменить
         val status = deviceDoc.getString("status")
         if (status == "confirmed") {
             call.respond(HttpStatusCode.BadRequest, ErrorMessage.CANNOT_CANCEL_CONFIRMED_DEVICE)
@@ -193,29 +191,41 @@ object ChildDeviceController {
             return call.respond(HttpStatusCode.BadRequest, ErrorMessage.DEVICE_ALREADY_CANCELLED)
         }
 
-        // Обновляем устройство, меняем статус на "cancelled" и очищаем childId
-        ChildDeviceCollection.updateDeviceStatus(deviceId, "cancelled", null)
-
-        call.respond(HttpStatusCode.OK, "Device confirmation request cancelled successfully.")
+        // Удаляем устройство из базы и проверяем результат
+        val deleted = ChildDeviceCollection.deleteDevice(deviceId, userId)
+        if (deleted) {
+            call.respond(HttpStatusCode.OK, "Device confirmation request cancelled and removed successfully.")
+        } else {
+            call.respond(HttpStatusCode.InternalServerError, "Failed to delete device from database")
+        }
     }
 
-//    suspend fun deactivateChildDevice(call: ApplicationCall) {
-//        val userId = call.principal<JWTPrincipal>()?.payload?.getClaim("userId")?.asString()
-//            ?: return call.respond(HttpStatusCode.Unauthorized, ErrorMessage.UNAUTHORIZED)
-//
-//        val deviceId = call.parameters["deviceId"]
-//            ?: return call.respond(HttpStatusCode.BadRequest, ErrorMessage.MISSING_DEVICE_ID)
-//
-//        val deviceDoc = ChildDeviceCollection.findByIdAndAccountId(deviceId, userId)
-//
-//        if (deviceDoc == null) {
-//            call.respond(HttpStatusCode.NotFound, ErrorMessage.DEVICE_NOT_FOUND)
-//            return
-//        }
-//
-//        ChildDeviceCollection.deactivateDevice(deviceId)
-//
-//        call.respond(HttpStatusCode.OK, "Device deactivated successfully.")
-//    }
+    suspend fun deleteDeviceAndChildProfile(call: ApplicationCall) {
+        val userId = call.principal<JWTPrincipal>()?.payload?.getClaim("userId")?.asString()
+            ?: return call.respond(HttpStatusCode.Unauthorized, ErrorMessage.UNAUTHORIZED)
 
+        val deviceId = call.parameters["deviceId"]
+            ?: return call.respond(HttpStatusCode.BadRequest, ErrorMessage.MISSING_DEVICE_ID)
+
+        val deviceDoc = ChildDeviceCollection.findByIdAndUserId(deviceId, userId)
+            ?: return call.respond(HttpStatusCode.NotFound, ErrorMessage.DEVICE_NOT_FOUND)
+
+        val childId = deviceDoc.getString("childId")
+
+        if (!childId.isNullOrEmpty()) {
+            val removed = UserCollection.removeChildFromUser(userId, childId)
+            if (removed) {
+                println("Профиль ребёнка $childId удалён из массива children пользователя $userId")
+            } else {
+                println("Не удалось удалить ребёнка $childId из профиля пользователя.")
+            }
+        }
+
+        val deviceDeleted = ChildDeviceCollection.deleteDevice(deviceId, userId)
+        if (deviceDeleted) {
+            call.respond(HttpStatusCode.OK, mapOf("message" to "Устройство и профиль ребёнка удалены"))
+        } else {
+            call.respond(HttpStatusCode.InternalServerError, mapOf("message" to "Ошибка удаления устройства"))
+        }
+    }
 }

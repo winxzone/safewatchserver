@@ -52,62 +52,6 @@ object ChildController {
 
     }
 
-    suspend fun addChild(call: ApplicationCall) {
-        val userId = call.principal<JWTPrincipal>()?.payload?.getClaim("userId")?.asString()
-            ?: return call.respond(HttpStatusCode.Unauthorized, "Unauthorized")
-
-        var childName: String? = null
-        var uploadedFileId: ObjectId? = null
-        val multipartData = call.receiveMultipart()
-
-        try {
-            multipartData.forEachPart { part ->
-                when {
-                    part is PartData.FormItem && part.name == "name" -> {
-                        childName = part.value.trim()
-                    }
-                    part is PartData.FileItem && part.name == "photo" -> {
-                        val fileBytes = part.provider().readRemaining().readByteArray()
-                        if (fileBytes.isNotEmpty()) {
-                            val fileName = part.originalFileName ?: "unknown.png"
-                            val contentType = part.contentType?.toString() ?: "application/octet-stream"
-
-                            val uploadOptions = GridFSUploadOptions().metadata(
-                                Document("fileName", fileName)
-                                    .append("contentType", contentType)
-                                    .append("uploadedAt", System.currentTimeMillis())
-                            )
-
-                            uploadedFileId = bucket.uploadFromStream(fileName, fileBytes.inputStream(), uploadOptions)
-                        }
-                    }
-                }
-                part.dispose()
-            }
-        } catch (e: Exception) {
-            println("Error processing multipart data: ${e.message}")
-            return call.respond(HttpStatusCode.InternalServerError, "Error processing request")
-        }
-
-        if (childName.isNullOrBlank()) {
-            return call.respond(HttpStatusCode.BadRequest, "Child name cannot be empty")
-        }
-
-        val childId = ObjectId()
-        val childDoc = Document()
-            .append("_id", childId)
-            .append("name", childName)
-            .append("photoId", uploadedFileId?.toHexString())
-
-        val updateResult = UserCollection.addChildToUser(userId, childDoc)
-
-        if (updateResult) {
-            call.respond(HttpStatusCode.Created, mapOf("message" to "Child added successfully", "childId" to childId.toHexString()))
-        } else {
-            call.respond(HttpStatusCode.NotFound, "User not found")
-        }
-    }
-
     suspend fun updateChildName(call: ApplicationCall) {
         val userId = call.principal<JWTPrincipal>()?.payload?.getClaim("userId")?.asString()
             ?: return call.respond(HttpStatusCode.Unauthorized, ErrorMessage.UNAUTHORIZED)

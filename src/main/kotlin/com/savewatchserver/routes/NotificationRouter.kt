@@ -14,7 +14,7 @@ fun Route.notificationRouter() {
             post("create") {
                 NotificationController.sendNotification(call)
             }
-            get("get") {
+            get("list") {
                 NotificationController.getNotifications(call)
             }
             delete("delete/{notificationId}") {

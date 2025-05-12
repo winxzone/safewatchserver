@@ -10,12 +10,12 @@ import org.bson.Document
 object UserValidator {
 
     // Проверка корректности имени
-    fun validateName(name: String): Boolean {
+    private fun validateName(name: String): Boolean {
         return name.isNotBlank() && name.length in 2..50
     }
 
     // Проверка корректности email
-    fun validateEmail(email: String): Boolean {
+    private fun validateEmail(email: String): Boolean {
         return email.matches(
             Regex(
                 "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}\$"
@@ -24,17 +24,17 @@ object UserValidator {
     }
 
     // Проверка корректности пароля
-    fun validatePassword(password: String): Boolean {
+    private fun validatePassword(password: String): Boolean {
         return password.length >= 6
     }
 
     // Проверка совпадения пароля и подтверждения
-    fun validatePasswordConfirmation(password: String, confirmPassword: String): Boolean {
+    private fun validatePasswordConfirmation(password: String, confirmPassword: String): Boolean {
         return password == confirmPassword
     }
 
     // Проверка на существование email в базе данных
-    suspend fun isEmailUnique(email: String): Boolean {
+    private fun isEmailUnique(email: String): Boolean {
         val userCollection = MongoDBConnection.database.getCollection("users")
         val existingUser = userCollection.find(Document("email", email)).first()
         return existingUser == null

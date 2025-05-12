@@ -12,5 +12,6 @@ data class Notification(
     val title: String,
     val message: String,
     val isRead: Boolean = false,
+    val isDeleted: Boolean = false,
     val timestamp: Long = System.currentTimeMillis()
 )

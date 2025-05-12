@@ -1,4 +1,4 @@
- package com.savewatchserver
+package com.savewatchserver
 
 import com.savewatchserver.plugins.*
 import io.ktor.server.application.*

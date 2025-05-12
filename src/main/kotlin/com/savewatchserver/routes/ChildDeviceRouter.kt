@@ -6,6 +6,7 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.post
 import io.ktor.server.routing.get
 import io.ktor.server.routing.route
+import io.ktor.server.routing.delete
 
 fun Route.childDeviceRouter() {
     route("/child-device") {
@@ -13,13 +14,13 @@ fun Route.childDeviceRouter() {
             post("/register") {
                 ChildDeviceController.registerChildDevice(call)
             }
-            post("/confirm/{deviceId}") {
+            post("/confirm/{childDeviceId}") {
                 ChildDeviceController.confirmChildDevice(call)
             }
             get("/list") {
                 ChildDeviceController.listChildDevices(call)
             }
-            post("/cancel/{deviceId}") {
+            delete("/cancel/{childDeviceId}") {
                 ChildDeviceController.cancelChildDeviceRequest(call)
             }
         }

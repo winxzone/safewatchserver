@@ -28,22 +28,32 @@ object ChildDeviceCollection {
         return collection.find(Filters.eq("userId", ObjectId(userId))).toList()
     }
 
-    fun findByIdAndUserId(deviceId: String, userId: String): Document? {
+    fun findByIdAndUserId(childDeviceId: String, userId: String): Document? {
         return collection.find(
             Filters.and(
-                Filters.eq("_id", ObjectId(deviceId)),
+                Filters.eq("_id", ObjectId(childDeviceId)),
                 Filters.eq("userId", ObjectId(userId))
             )
         ).firstOrNull()
     }
 
-    fun updateDeviceStatus(deviceId: String, status: String, childId: String? = null) {
+    fun updateDeviceStatus(childDeviceId: String, status: String, childId: String? = null) {
         val updates = Updates.combine(
             Updates.set("status", status),
             Updates.set("childId", childId),
             Updates.set("confirmedAt", System.currentTimeMillis())
         )
-        collection.updateOne(Filters.eq("_id", ObjectId(deviceId)), updates)
-        println("Updated device $deviceId to status $status with childId $childId")
+        collection.updateOne(Filters.eq("_id", ObjectId(childDeviceId)), updates)
+        println("Updated device $childDeviceId to status $status with childId $childId")
+    }
+
+    fun deleteDevice(deviceId: String, userId: String): Boolean {
+        val result = collection.deleteOne(
+            Filters.and(
+                Filters.eq("_id", ObjectId(deviceId)),
+                Filters.eq("userId", ObjectId(userId))
+            )
+        )
+        return result.deletedCount > 0
     }
 }
