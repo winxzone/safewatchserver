@@ -10,7 +10,7 @@ import com.mongodb.client.gridfs.GridFSBuckets
 
 object MongoDBConnection {
     private const val CONNECTION_STRING = "mongodb://localhost:27017"
-    private const val DATABASE_NAME = "safewatchserver"
+    private const val DATABASE_NAME = "SafewatchDB"
 
     private val client: MongoClient by lazy {
         MongoClients.create(
@@ -22,10 +22,6 @@ object MongoDBConnection {
 
     val database: MongoDatabase by lazy {
         client.getDatabase(DATABASE_NAME)
-    }
-
-    val ScreenshotsBucket: GridFSBucket by lazy {
-        GridFSBuckets.create(database, "Screenshots")
     }
 
     val childAvatarsBucket: GridFSBucket by lazy {

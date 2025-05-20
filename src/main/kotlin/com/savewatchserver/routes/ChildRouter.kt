@@ -28,6 +28,9 @@ fun Route.childRouter() {
             get("/all") {
                 ChildController.getAllChildren(call)
             }
+            get("/{childId}/expanded-profile"){
+                ChildController.getExpandedChildProfile(call)
+            }
         }
     }
 }

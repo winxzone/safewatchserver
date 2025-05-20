@@ -7,10 +7,12 @@ import com.mongodb.client.model.UpdateOptions
 import com.mongodb.client.model.Updates
 import com.savewatchserver.MongoDBConnection
 import com.savewatchserver.MongoDBConnection.database
+import com.savewatchserver.collections.ChildDeviceCollection
 import com.savewatchserver.collections.UserCollection
 import com.savewatchserver.collections.UserCollection.deleteOldPhoto
 import com.savewatchserver.models.Child
 import com.savewatchserver.constants.ErrorMessage
+import com.savewatchserver.models.ExpandedChildProfile
 import io.ktor.http.*
 import io.ktor.http.content.PartData
 import io.ktor.http.content.forEachPart
@@ -51,6 +53,51 @@ object ChildController {
         call.respond(HttpStatusCode.OK, childProfile)
 
     }
+
+
+    // todo: дореализовать ентпоинт
+    suspend fun getExpandedChildProfile(call: ApplicationCall) {
+        val userId = call.principal<JWTPrincipal>()?.payload?.getClaim("userId")?.asString()
+            ?: return call.respond(HttpStatusCode.Unauthorized)
+
+        val childId = call.parameters["childId"] ?: return call.respond(HttpStatusCode.BadRequest, "Missing childId")
+
+        val userDoc = UserCollection.findById(userId)
+            ?: return call.respond(HttpStatusCode.NotFound, "User not found")
+
+        val childrenDocs = userDoc.getList("children", Document::class.java)
+        val childDoc = childrenDocs.find { it.getObjectId("_id").toHexString() == childId }
+            ?: return call.respond(HttpStatusCode.NotFound, "Child not found")
+
+        val name = childDoc.getString("name")
+        val photoId = childDoc.getString("photoId")
+        val id = childDoc.getObjectId("_id").toHexString()
+
+        // Получаем childDeviceId по childId
+        val deviceDoc = ChildDeviceCollection.findByChildId(childId)
+        val childDeviceId = deviceDoc?.getString("deviceId")
+
+        val summary = try {
+            if (childDeviceId != null)
+                SummaryController.getDailySummary(childDeviceId, null)
+            else null
+        } catch (e: NoDataForSummaryException) {
+            null
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+
+        val response = ExpandedChildProfile(
+            id = id,
+            name = name,
+            photoId = photoId,
+            summary = summary
+        )
+
+        call.respond(HttpStatusCode.OK, response)
+    }
+
 
     suspend fun updateChildName(call: ApplicationCall) {
         val userId = call.principal<JWTPrincipal>()?.payload?.getClaim("userId")?.asString()

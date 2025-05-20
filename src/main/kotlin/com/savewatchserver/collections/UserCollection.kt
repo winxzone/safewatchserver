@@ -83,4 +83,13 @@ object UserCollection {
         }
     }
 
+    fun removeChildFromUser(userId: String, childId: String): Boolean {
+        val result = collection.updateOne(
+            Filters.eq("_id", ObjectId(userId)),
+            Updates.pull("children", Filters.eq("_id", ObjectId(childId)))
+        )
+        return result.modifiedCount > 0
+    }
+
+
 }
