@@ -10,7 +10,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import io.ktor.serialization.kotlinx.json.*
 
-
 object EmotionAnalyzerService {
 
     private val client = HttpClient(CIO) {
@@ -23,21 +22,37 @@ object EmotionAnalyzerService {
         }
     }
 
-
     @Serializable
     data class EmotionRequest(val messages: List<String>)
 
     @Serializable
     data class EmotionResponse(val emotion: String, val confidence: Double)
 
-    suspend fun analyze(messages: List<String>): EmotionResponse {
+    // Новый метод: отправляем батч, получаем список результатов
+    suspend fun analyzeIndividual(messages: List<String>): List<EmotionResponse> {
+        if (messages.isEmpty()) {
+            return emptyList()
+        }
 
+        return try {
+            client.post("http://localhost:8000/analyze-individual") {
+                contentType(ContentType.Application.Json)
+                setBody(EmotionRequest(messages))
+            }.body()
+        } catch (e: Exception) {
+            println("EmotionAnalyzerService error: ${e.message}")
+            // Возвращаем список с unknown для каждого сообщения
+            messages.map { EmotionResponse(emotion = "unknown", confidence = 0.0) }
+        }
+    }
+
+    // Старый метод для совместимости (усредненный результат)
+    suspend fun analyze(messages: List<String>): EmotionResponse {
         if (messages.isEmpty()) {
             return EmotionResponse(emotion = "unknown", confidence = 0.0)
         }
 
         return try {
-
             client.post("http://localhost:8000/analyze") {
                 contentType(ContentType.Application.Json)
                 setBody(EmotionRequest(messages))

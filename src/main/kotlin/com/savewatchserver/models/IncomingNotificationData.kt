@@ -3,15 +3,10 @@ package com.savewatchserver.models
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class ScreenEvent(
+data class IncomingNotificationData(
     val childDeviceId: String,
-    val event: ScreenEventType,
+    val packageName: String,
+    val title: String,
+    val text: String,
     val timestamp: String
 )
-
-@Serializable
-enum class ScreenEventType {
-    SCREEN_ON,
-    SCREEN_OFF,
-    UNLOCKED
-}

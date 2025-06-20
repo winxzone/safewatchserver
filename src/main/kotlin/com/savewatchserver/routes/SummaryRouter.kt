@@ -27,9 +27,6 @@ fun Route.summaryRouter() {
                     call.application.environment.log.error("Failed to get daily summary", e)
                     call.respond(HttpStatusCode.InternalServerError, "Internal server error")
                 }
-
-
-                // todo: Проверить общий отчет за день, проверить python ai, BehaviorAnalyzer - сервисы
             }
         }
     }

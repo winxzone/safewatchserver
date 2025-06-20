@@ -4,6 +4,8 @@ val mongo_version: String by project
 val bcrypt_version: String by project
 val kmongo_version: String by project
 val dotenv_version: String by project
+val ktor_version: String by project
+val kotlinx_serialization_json: String by project
 
 plugins {
     kotlin("jvm") version "2.0.21"
@@ -28,7 +30,12 @@ repositories {
 
 dependencies {
     implementation("org.litote.kmongo:kmongo:$kmongo_version")
-    implementation("org.litote.kmongo:kmongo-serialization:$kmongo_version")
+    implementation("io.ktor:ktor-client-core:$ktor_version")
+    implementation("io.ktor:ktor-client-cio:$ktor_version")
+    implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
+
+    implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinx_serialization_json")
 
     implementation("io.github.cdimascio:dotenv-kotlin:$dotenv_version")
     implementation("org.mindrot:jbcrypt:$bcrypt_version")

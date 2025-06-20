@@ -2,6 +2,7 @@ package com.savewatchserver.collections
 
 import com.mongodb.client.MongoCollection
 import com.mongodb.client.model.Filters
+import com.mongodb.client.model.Filters.eq
 import com.mongodb.client.model.Updates
 import com.savewatchserver.MongoDBConnection
 import com.savewatchserver.models.ChildDevice
@@ -25,14 +26,18 @@ object ChildDeviceCollection {
     }
 
     fun findByAccountId(userId: String): List<Document> {
-        return collection.find(Filters.eq("userId", ObjectId(userId))).toList()
+        return collection.find(eq("userId", ObjectId(userId))).toList()
+    }
+
+    fun findByChildId(childId: String): Document? {
+        return collection.find(eq("childId", childId)).firstOrNull()
     }
 
     fun findByIdAndUserId(childDeviceId: String, userId: String): Document? {
         return collection.find(
             Filters.and(
-                Filters.eq("_id", ObjectId(childDeviceId)),
-                Filters.eq("userId", ObjectId(userId))
+                eq("_id", ObjectId(childDeviceId)),
+                eq("userId", ObjectId(userId))
             )
         ).firstOrNull()
     }
@@ -43,15 +48,15 @@ object ChildDeviceCollection {
             Updates.set("childId", childId),
             Updates.set("confirmedAt", System.currentTimeMillis())
         )
-        collection.updateOne(Filters.eq("_id", ObjectId(childDeviceId)), updates)
+        collection.updateOne(eq("_id", ObjectId(childDeviceId)), updates)
         println("Updated device $childDeviceId to status $status with childId $childId")
     }
 
-    fun deleteDevice(deviceId: String, userId: String): Boolean {
+    fun deleteDevice(childDeviceId: String, userId: String): Boolean {
         val result = collection.deleteOne(
             Filters.and(
-                Filters.eq("_id", ObjectId(deviceId)),
-                Filters.eq("userId", ObjectId(userId))
+                eq("_id", ObjectId(childDeviceId)),
+                eq("userId", ObjectId(userId))
             )
         )
         return result.deletedCount > 0

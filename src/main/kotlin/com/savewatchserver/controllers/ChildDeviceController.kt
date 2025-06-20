@@ -2,7 +2,10 @@ package com.savewatchserver.controllers
 
 import com.mongodb.client.gridfs.model.GridFSUploadOptions
 import com.savewatchserver.MongoDBConnection
+import com.savewatchserver.collections.AppUsageDataCollection
 import com.savewatchserver.collections.ChildDeviceCollection
+import com.savewatchserver.collections.NotificationEmotionsDataCollection
+import com.savewatchserver.collections.ScreenEventsDataCollection
 import com.savewatchserver.collections.UserCollection
 import com.savewatchserver.models.ChildDevice
 import com.savewatchserver.constants.ErrorMessage
@@ -113,7 +116,7 @@ object ChildDeviceController {
 
         println("Processing: childDeviceId=$childDeviceId, name=$name, userId=$userId")
 
-        val deviceDoc = ChildDeviceCollection.findByIdAndUserId(childDeviceId!!, userId)
+        val deviceDoc = ChildDeviceCollection.findByIdAndUserId(childDeviceId, userId)
         if (deviceDoc == null) {
             println("Device not found: $childDeviceId for user: $userId")
             return call.respond(HttpStatusCode.NotFound, ErrorMessage.DEVICE_NOT_FOUND)
@@ -126,7 +129,7 @@ object ChildDeviceController {
         }
 
         val childId = ObjectId()
-        val child = Child(id = childId.toHexString(), name = name!!, photoId = photoId?.toHexString())
+        val child = Child(id = childId.toHexString(), name = name, photoId = photoId?.toHexString())
         println("Child created: $childId with name: $name")
 
         val updateResult = UserCollection.addChildToUser(userId, childId, child)
@@ -135,7 +138,7 @@ object ChildDeviceController {
             return call.respond(HttpStatusCode.NotFound, "User not found")
         }
 
-        ChildDeviceCollection.updateDeviceStatus(childDeviceId!!, "confirmed", childId.toHexString())
+        ChildDeviceCollection.updateDeviceStatus(childDeviceId, "confirmed", childId.toHexString())
         println("Device $childDeviceId confirmed and linked to child $childId")
 
         call.respond(HttpStatusCode.OK, mapOf("childId" to childId.toHexString()))
@@ -172,27 +175,26 @@ object ChildDeviceController {
         val userId = call.principal<JWTPrincipal>()?.payload?.getClaim("userId")?.asString()
             ?: return call.respond(HttpStatusCode.Unauthorized, ErrorMessage.UNAUTHORIZED)
 
-        val deviceId = call.parameters["deviceId"]
+        val childDeviceId = call.parameters["childDeviceId"]
             ?: return call.respond(HttpStatusCode.BadRequest, ErrorMessage.MISSING_DEVICE_ID)
 
-        val deviceDoc = ChildDeviceCollection.findByIdAndUserId(deviceId, userId)
+        val deviceDoc = ChildDeviceCollection.findByIdAndUserId(childDeviceId, userId)
 
         if (deviceDoc == null) {
             call.respond(HttpStatusCode.NotFound, ErrorMessage.DEVICE_NOT_FOUND)
             return
         }
 
+        println("Found device: $deviceDoc")
+
         val status = deviceDoc.getString("status")
         if (status == "confirmed") {
             call.respond(HttpStatusCode.BadRequest, ErrorMessage.CANNOT_CANCEL_CONFIRMED_DEVICE)
             return
         }
-        if (status == "cancelled") {
-            return call.respond(HttpStatusCode.BadRequest, ErrorMessage.DEVICE_ALREADY_CANCELLED)
-        }
 
         // Удаляем устройство из базы и проверяем результат
-        val deleted = ChildDeviceCollection.deleteDevice(deviceId, userId)
+        val deleted = ChildDeviceCollection.deleteDevice(childDeviceId, userId)
         if (deleted) {
             call.respond(HttpStatusCode.OK, "Device confirmation request cancelled and removed successfully.")
         } else {
@@ -204,10 +206,10 @@ object ChildDeviceController {
         val userId = call.principal<JWTPrincipal>()?.payload?.getClaim("userId")?.asString()
             ?: return call.respond(HttpStatusCode.Unauthorized, ErrorMessage.UNAUTHORIZED)
 
-        val deviceId = call.parameters["deviceId"]
+        val childDeviceId = call.parameters["childDeviceId"]
             ?: return call.respond(HttpStatusCode.BadRequest, ErrorMessage.MISSING_DEVICE_ID)
 
-        val deviceDoc = ChildDeviceCollection.findByIdAndUserId(deviceId, userId)
+        val deviceDoc = ChildDeviceCollection.findByIdAndUserId(childDeviceId, userId)
             ?: return call.respond(HttpStatusCode.NotFound, ErrorMessage.DEVICE_NOT_FOUND)
 
         val childId = deviceDoc.getString("childId")
@@ -219,9 +221,16 @@ object ChildDeviceController {
             } else {
                 println("Не удалось удалить ребёнка $childId из профиля пользователя.")
             }
+
+            // Удаление данных, связанных с childDeviceId
+            val notificationDeleted = NotificationEmotionsDataCollection.deleteManyByDeviceId(childDeviceId)
+            val usageDeleted = AppUsageDataCollection.deleteManyByDeviceId(childDeviceId)
+            val screenEventsDeleted = ScreenEventsDataCollection.deleteManyByDeviceId(childDeviceId)
+
+            println("Удалено notificationEmotions: $notificationDeleted, appUsage: $usageDeleted, screenEvents: $screenEventsDeleted")
         }
 
-        val deviceDeleted = ChildDeviceCollection.deleteDevice(deviceId, userId)
+        val deviceDeleted = ChildDeviceCollection.deleteDevice(childDeviceId, userId)
         if (deviceDeleted) {
             call.respond(HttpStatusCode.OK, mapOf("message" to "Устройство и профиль ребёнка удалены"))
         } else {

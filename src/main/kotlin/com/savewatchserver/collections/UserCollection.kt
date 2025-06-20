@@ -45,14 +45,22 @@ object UserCollection {
             ?.getString("photoId")
     }
 
-
     fun updateChildPhoto(childId: ObjectId, newPhotoId: String): Boolean {
-        val updateResult = collection.updateOne(
-            Filters.eq("children._id", childId),
-            Updates.set("children.$[elem].photoId", newPhotoId),
-            UpdateOptions().arrayFilters(listOf(Filters.eq("elem._id", childId)))
-        )
-        return updateResult.matchedCount > 0
+        return try {
+            val updateResult = collection.updateOne(
+                Filters.eq("children._id", childId),
+                Updates.set("children.$[elem].photoId", newPhotoId),
+                UpdateOptions().arrayFilters(listOf(
+                    Document("elem._id", childId)
+                ))
+            )
+
+            println("Matched: ${updateResult.matchedCount}, Modified: ${updateResult.modifiedCount}")
+            updateResult.modifiedCount > 0
+        } catch (e: Exception) {
+            println("Error updating child photoId: ${e.message}")
+            false
+        }
     }
 
     fun addChildToUser(userId: String, childId: ObjectId, child: Child): Boolean {

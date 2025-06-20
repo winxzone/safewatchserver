@@ -54,13 +54,13 @@ object ChildController {
 
     }
 
-
-    // todo: дореализовать ентпоинт
     suspend fun getExpandedChildProfile(call: ApplicationCall) {
         val userId = call.principal<JWTPrincipal>()?.payload?.getClaim("userId")?.asString()
             ?: return call.respond(HttpStatusCode.Unauthorized)
 
         val childId = call.parameters["childId"] ?: return call.respond(HttpStatusCode.BadRequest, "Missing childId")
+
+        val date = call.request.queryParameters["date"]
 
         val userDoc = UserCollection.findById(userId)
             ?: return call.respond(HttpStatusCode.NotFound, "User not found")
@@ -75,13 +75,13 @@ object ChildController {
 
         // Получаем childDeviceId по childId
         val deviceDoc = ChildDeviceCollection.findByChildId(childId)
-        val childDeviceId = deviceDoc?.getString("deviceId")
+        val childDeviceId = deviceDoc?.getObjectId("_id")?.toHexString()
 
         val summary = try {
             if (childDeviceId != null)
-                SummaryController.getDailySummary(childDeviceId, null)
+                SummaryController.getDailySummary(childDeviceId, date)
             else null
-        } catch (e: NoDataForSummaryException) {
+        } catch (_: NoDataForSummaryException) {
             null
         } catch (e: Exception) {
             e.printStackTrace()
@@ -161,7 +161,7 @@ object ChildController {
 
         val validChildId = try {
             ObjectId(childId)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             return call.respond(HttpStatusCode.BadRequest, "Invalid Child ID format")
         }
 
@@ -173,27 +173,40 @@ object ChildController {
         var uploadedFileId: ObjectId? = null
 
         multipartData.forEachPart { part ->
-            if (part is PartData.FileItem && part.name == "photo") {
-                val fileBytes = part.provider().readRemaining().readByteArray()
-                if (fileBytes.isEmpty()) {
+            try {
+                if (part is PartData.FileItem && part.name == "photo") {
+                    val fileBytes = part.provider().readRemaining().readByteArray()
+                    if (fileBytes.isEmpty()) {
+                        part.dispose()
+                        return@forEachPart
+                    }
+
+                    val fileName = part.originalFileName ?: "unknown.png"
+                    val contentType = part.contentType?.toString() ?: "application/octet-stream"
+
+                    val uploadOptions = GridFSUploadOptions().metadata(
+                        Document("childId", validChildId.toHexString())
+                            .append("fileName", fileName)
+                            .append("contentType", contentType)
+                            .append("uploadedAt", System.currentTimeMillis())
+                    )
+
+                    println("Uploading file: $fileName (${fileBytes.size} bytes)")
+
+                    uploadedFileId = bucket.uploadFromStream(fileName, fileBytes.inputStream(), uploadOptions)
+
+                    println("Uploaded file to GridFS with ID: $uploadedFileId")
+
                     part.dispose()
                     return@forEachPart
                 }
-
-                val fileName = part.originalFileName ?: "unknown.png"
-                val contentType = part.contentType?.toString() ?: "application/octet-stream"
-
-                val uploadOptions = GridFSUploadOptions().metadata(
-                    Document("childId", validChildId.toHexString())
-                        .append("fileName", fileName)
-                        .append("contentType", contentType)
-                        .append("uploadedAt", System.currentTimeMillis())
-                )
-
-                uploadedFileId = bucket.uploadFromStream(fileName, fileBytes.inputStream(), uploadOptions)
+            } catch (e: Exception) {
                 part.dispose()
-                return@forEachPart
+                println("Exception during file upload: ${e.message}")
+                e.printStackTrace()
+                return@forEachPart call.respond(HttpStatusCode.InternalServerError, "File upload failed: ${e.message}")
             }
+
             part.dispose()
         }
 
@@ -215,7 +228,7 @@ object ChildController {
                 println("No old photo ID found, skipping deletion")
             }
 
-            println("New photo uploaded with fileId: ${uploadedFileId.toString()}")
+            println("New photo uploaded with fileId: $uploadedFileId")
             call.respond(HttpStatusCode.OK, mapOf("fileId" to uploadedFileId.toString()))
         } catch (e: Exception) {
             call.respond(HttpStatusCode.InternalServerError, "Error updating child photo: ${e.message}")
@@ -239,7 +252,7 @@ object ChildController {
 
             val objectId = try {
                 ObjectId(photoId)
-            } catch (e: IllegalArgumentException) {
+            } catch (_: IllegalArgumentException) {
                 return call.respond(HttpStatusCode.BadRequest, "Invalid photoId format in database")
             }
 
